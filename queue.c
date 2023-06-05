@@ -11,6 +11,7 @@ typedef struct node_fifo
     struct node_fifo* next;
     struct node_fifo* prev;
     struct node_fifo* parent;
+    int id;
 } node_fifo;
 
 typedef struct node_cnd
@@ -43,6 +44,7 @@ queue* q;
 cnd_queue* cnd;
 mtx_t mtx;
 queue* ready_to_deq;
+int cnt = 0;
 
 void initQueue(void)
 {
@@ -122,15 +124,17 @@ void enqueue(void* data)
     ///It should add the given data pointer to the queue.
     node_fifo* new_node = malloc(sizeof(node_fifo));
     node_fifo* tmp;
-    new_node->data = data;
     mtx_lock(&mtx);
+    new_node->data = data;
+    new_node -> id = cnt;
+    cnt++;
     if(cnd->nxt_deq != NULL)
     {
         //there is a thread waiting to dequeue
         cnd->nxt_deq->p = new_node;
         cnd_signal(&(cnd->nxt_deq->cond));
-        cnd->nxt_deq = cnd->nxt_deq->next;
         mtx_unlock(&mtx);
+        return;
     }
     else
     {
@@ -164,8 +168,8 @@ void enqueue(void* data)
             ready_to_deq->tail = tmp;
         }
         mtx_unlock(&mtx);
+        return;
     }
-    return;
 }
 
 void* dequeue(void)
@@ -234,7 +238,7 @@ void* dequeue(void)
     }
     else
     {
-        q->tail = NULL;
+        q->tail = ret->prev;
     }
     q->head = ret->next;
     q->size--;
@@ -261,7 +265,7 @@ void* dequeue(void)
         {
             cnd->tail = new_node->prev;
         }
-        cnd_destroy(&new_node->cond);
+        cnd_destroy(&(new_node->cond));
         free(new_node);
     }
     mtx_unlock(&mtx);
@@ -299,7 +303,7 @@ bool tryDequeue(void** ret)
         {
             q->tail = NULL;
         }
-        if(q->head == item)
+        if(q->head->id == item->id)
         {
             q->head = item->next;
         }
@@ -312,7 +316,7 @@ bool tryDequeue(void** ret)
         ret = &(item->data);
         free(item);
         mtx_unlock(&mtx);
-        return ret;
+        return true;
     }
 }
 
