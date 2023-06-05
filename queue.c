@@ -5,11 +5,6 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 
-queue* q;
-cnd_queue* cnd;
-mtx_t mtx;
-queue* ready_to_deq;
-
 typedef struct node_fifo
 {
     void* data;
@@ -44,6 +39,11 @@ typedef struct fifo_queue
     size_t visited;
 } queue;
 
+queue* q;
+cnd_queue* cnd;
+mtx_t mtx;
+queue* ready_to_deq;
+
 void initQueue(void)
 {
     ///This function will be called before the queue is used.
@@ -54,12 +54,12 @@ void initQueue(void)
     q->size = 0;
     q->visited = 0;
     cnd = malloc(sizeof(cnd_queue));
-    cnd.head = NULL;
-    cnd.tail = NULL;
-    cnd.nxt_deq = NULL;
-    cnd.waiting = 0;
-    q->cnd = cnd;
-    mtx_init(mtx, mtx_plain);
+    cnd->head = NULL;
+    cnd->tail = NULL;
+    cnd->nxt_deq = NULL;
+    cnd->waiting = 0;
+    q->cnd = *cnd;
+    mtx_init(&mtx, mtx_plain);
     ready_to_deq = malloc(sizeof(queue));
     ready_to_deq->head = NULL;
     ready_to_deq->tail = NULL;
@@ -73,7 +73,9 @@ void destroyQueue(void)
     ///It should clean up any memory or other resources used by the queue.
     node_fifo* tmp;
     node_fifo* tmp2;
-    mtx_lock(mtx);
+    node_cnd* cnd_tmp;
+    node_cnd* cnd_tmp2;
+    mtx_lock(&mtx);
     if(q->head != NULL)
     {
         tmp = q->head;
@@ -89,14 +91,13 @@ void destroyQueue(void)
     free(q);
     if(cnd->head != NULL)
     {
-        tmp = cnd->head;
-        while(tmp != NULL)
+        cnd_tmp = cnd->head;
+        while(cnd_tmp != NULL)
         {
-            tmp2 = tmp;
-            tmp = tmp->next;
-            if(tmp2->cnd != NULL)
-                free(tmp2->cnd);
-            free(tmp2);
+            cnd_tmp2 = cnd_tmp;
+            cnd_tmp = cnd_tmp->next;
+            cnd_destroy(&cnd_tmp2->cond);
+            free(cnd_tmp2);
         }
     }
     free(cnd);
@@ -111,8 +112,8 @@ void destroyQueue(void)
         }
     }
     free(ready_to_deq);
-    mtx_unlock(mtx);
-    mtx_destroy(mtx);
+    mtx_unlock(&mtx);
+    mtx_destroy(&mtx);
 }
 
 void enqueue(void* data)
@@ -122,14 +123,14 @@ void enqueue(void* data)
     node_fifo* new_node = malloc(sizeof(node_fifo));
     node_fifo* tmp;
     new_node->data = data;
-    mtx_lock(mtx);
-    if(cnd_queue->last_deq != NULL)
+    mtx_lock(&mtx);
+    if(cnd->nxt_deq != NULL)
     {
         //there is a thread waiting to dequeue
-        cnd_queue->last_deq->p = new_node;
-        cnd_signal(cnd_queue->last_deq->cnd);
-        cnd_queue->last_deq = cnd_queue->last_deq->next;
-        mtx_unlock(mtx);
+        cnd->nxt_deq->p = new_node;
+        cnd_signal(&(cnd->nxt_deq->cond));
+        cnd->nxt_deq = cnd->nxt_deq->next;
+        mtx_unlock(&mtx);
     }
     else
     {
@@ -162,18 +163,19 @@ void enqueue(void* data)
             tmp->prev = ready_to_deq->tail;
             ready_to_deq->tail = tmp;
         }
-        mtx_unlock(mtx);
+        mtx_unlock(&mtx);
     }
-
-
+    return;
 }
 
 void* dequeue(void)
 {
     node_cnd* new_node;
-    nofe_fifo* tmp;
-    nofe_fifo* ret;
-    mtx_lock(mtx);
+    node_fifo* tmp;
+    node_fifo* ret;
+    cnd_t c;
+    cnd_init(&c);
+    mtx_lock(&mtx);
     if(ready_to_deq->head == NULL)
     {
         //no item is waiting to be dequeued
@@ -181,8 +183,7 @@ void* dequeue(void)
         new_node->p = NULL;
         new_node->next = NULL;
         new_node->prev = NULL;
-        new_node->cnd = malloc(sizeof(cnd_t));
-        cnd_init(new_node->cnd);
+        new_node->cond = c;
         if(cnd->head == NULL)
         {
             cnd->head = new_node;
@@ -196,11 +197,12 @@ void* dequeue(void)
             cnd->tail = new_node;
         }
         cnd->waiting++;
-        cnd_wait(new_node->cnd, mtx);
+        cnd_wait(&(new_node->cond), &mtx);
     }
     //now i have an item to dequeue
     ret = cnd->nxt_deq->p;//item in fifo
     tmp = ret->parent;//item in ready_to_deq
+    new_node = cnd->nxt_deq;
     if(tmp->prev == NULL)
     {
         ready_to_deq->head = tmp->next;
@@ -241,28 +243,28 @@ void* dequeue(void)
     free(ret);
     cnd->nxt_deq = cnd->nxt_deq->next;
     cnd->waiting--;
-    if(cnd->prev != NULL)
+    if(new_node!=NULL)
     {
-        cnd->prev->next = cnd->next;
-    }
-    else
-    {
-        cnd->head = cnd->next;
-    }
-    if(cnd->next != NULL)
-    {
-        cnd->next->prev = cnd->prev;
-    }
-    else
-    {
-        cnd->tail = cnd->prev;
-    }
-    free(cnd);
-    if(new_node != NULL)
-    {
+        if(new_node->prev != NULL)
+        {
+            new_node->prev->next = new_node->next;
+        }
+        else
+        {
+            cnd->head = new_node->next;
+        }
+        if(new_node->next != NULL)
+        {
+            new_node->next->prev = new_node->prev;
+        }
+        else
+        {
+            cnd->tail = new_node->prev;
+        }
+        cnd_destroy(&new_node->cond);
         free(new_node);
     }
-    mtx_unlock(mtx);
+    mtx_unlock(&mtx);
     return data;    
 }
 
@@ -270,10 +272,10 @@ bool tryDequeue(void** ret)
 {
     node_fifo* tmp = ready_to_deq->head;
     node_fifo* item;
-    mtx_lock(mtx);
+    mtx_lock(&mtx);
     if(tmp == NULL)
     {
-        mtx_unlock(mtx);
+        mtx_unlock(&mtx);
         return false;
     }
     else
@@ -309,11 +311,9 @@ bool tryDequeue(void** ret)
         q->visited++;
         ret = &(item->data);
         free(item);
-        mtx_unlock(mtx);
+        mtx_unlock(&mtx);
         return ret;
     }
-    
-
 }
 
 size_t size(void)
@@ -324,9 +324,9 @@ size_t size(void)
 size_t waiting(void)
 {
     size_t waiting;
-    mtx_lock(mtx);
+    mtx_lock(&mtx);
     waiting = cnd->waiting;
-    mtx_unlock(mtx);
+    mtx_unlock(&mtx);
     return waiting;
 }
 
