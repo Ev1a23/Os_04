@@ -71,7 +71,7 @@ void initQueue(void)
 
 void destroyQueue(void)
 {
-        ///This function will be called when the queue is no longer needed.
+    ///This function will be called when the queue is no longer needed.
     ///It should clean up any memory or other resources used by the queue.
     node_fifo* tmp;
     node_fifo* tmp2;
@@ -180,7 +180,7 @@ void* dequeue(void)
     cnd_t c;
     cnd_init(&c);
     mtx_lock(&mtx);
-    if (ready_to_deq->head == NULL)
+    if(ready_to_deq->head == NULL)
     {
         //no item is waiting to be dequeued
         new_node = malloc(sizeof(node_cnd));
