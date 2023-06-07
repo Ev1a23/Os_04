@@ -199,7 +199,6 @@ void* dequeue(void)
             new_node->prev = cnd->tail;
             cnd->tail = new_node;
         }
-        printf("waiting");
         cnd->waiting++;
         cnd_wait(&(new_node->cond), &mtx);
         ret = cnd->nxt_deq->p;//item in fifo
