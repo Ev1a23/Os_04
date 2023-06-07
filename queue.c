@@ -85,8 +85,6 @@ void destroyQueue(void)
         {
             tmp2 = tmp;
             tmp = tmp->next;
-            if (tmp2->data != NULL)
-                free(tmp2->data);
             free(tmp2);
         }
     }
@@ -174,11 +172,11 @@ void enqueue(void* data)
 
 void* dequeue(void)
 {
-    printf("dequeue\n");
     node_cnd* new_node;
     node_fifo* tmp;
     node_fifo* ret;
     cnd_t c;
+    void* data;
     cnd_init(&c);
     mtx_lock(&mtx);
     if(ready_to_deq->head == NULL)
@@ -189,7 +187,6 @@ void* dequeue(void)
         new_node->next = NULL;
         new_node->prev = NULL;
         new_node->cond = c;
-        printf("init new_node");
         if (cnd->head == NULL)
         {
             cnd->head = new_node;
@@ -213,48 +210,52 @@ void* dequeue(void)
         //there is an item waiting to be dequeued
         ret = ready_to_deq->head->parent;
         tmp = ret->parent;
-
     }
     //now i have an item to dequeue
     new_node = cnd->nxt_deq;
-    if (tmp->prev == NULL)
-    {
-        ready_to_deq->head = tmp->next;
-        if (tmp->next != NULL)
+    if(tmp!=NULL){
+        if (tmp->prev == NULL)
         {
-            tmp->next->prev = NULL;
+            ready_to_deq->head = tmp->next;
+            if (tmp->next != NULL)
+            {
+                tmp->next->prev = NULL;
+            }
+            else
+            {
+                ready_to_deq->tail = NULL;
+            }
         }
         else
         {
-            ready_to_deq->tail = NULL;
+            tmp->prev->next = tmp->next;
+            if (tmp->next != NULL)
+            {
+                tmp->next->prev = tmp->prev;
+            }
+            else
+            {
+                ready_to_deq->tail = tmp->prev;
+            }
         }
+        free(tmp);
     }
-    else
+    if(ret!=NULL)
     {
-        tmp->prev->next = tmp->next;
-        if (tmp->next != NULL)
+        if (ret->next != NULL)
         {
-            tmp->next->prev = tmp->prev;
+            ret->next->prev = ret->prev;
         }
         else
         {
-            ready_to_deq->tail = tmp->prev;
+            q->tail = ret->prev;
         }
+        q->head = ret->next;
+        q->size--;
+        q->visited++;
+        data = ret->data;
+        free(ret);
     }
-    free(tmp);
-    if (ret->next != NULL)
-    {
-        ret->next->prev = ret->prev;
-    }
-    else
-    {
-        q->tail = ret->prev;
-    }
-    q->head = ret->next;
-    q->size--;
-    q->visited++;
-    void* data = ret->data;
-    free(ret);
     if (new_node != NULL)
     {
         cnd->nxt_deq = cnd->nxt_deq->next;
@@ -349,36 +350,3 @@ size_t visited(void)
     return q->visited;
 }
 
-//int main()
-// {
-//     int items[] = {1, 2, 3, 4, 5};
-//     size_t num_items = sizeof(items) / sizeof(items[0]);
-//     int* item = malloc(sizeof(int));
-//     initQueue();
-//     for (size_t i = 0; i < num_items; i++)
-//     {
-//         enqueue(&items[i]);
-//     }
-//     for (size_t i = 0; i < num_items; i++)
-//     {
-//         printf("Size: %zu\n", size());
-//         item = (int *)dequeue();
-//         printf("Dequeued: %d\n", *item);
-//         if(*item != items[i])
-//         {
-//             printf("dequeue test failed.\n");
-//             return 1;
-//         }
-//     }
-//     if((size() != 0))
-//     {
-//         printf("dequeue test failed.\n");
-//         return 1;
-//     }
-
-//     destroyQueue();
-
-//     printf("enqueue and dequeue test passed.\n");
-//     return 0;
-
-// }
