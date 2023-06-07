@@ -205,10 +205,17 @@ void* dequeue(void)
         printf("waiting");
         cnd->waiting++;
         cnd_wait(&(new_node->cond), &mtx);
+        ret = cnd->nxt_deq->p;//item in fifo
+        tmp = ret->parent;//item in ready_to_deq
+    }
+    else
+    {
+        //there is an item waiting to be dequeued
+        ret = ready_to_deq->head->parent;
+        tmp = ret->parent;
+
     }
     //now i have an item to dequeue
-    ret = cnd->nxt_deq->p;//item in fifo
-    tmp = ret->parent;//item in ready_to_deq
     new_node = cnd->nxt_deq;
     if (tmp->prev == NULL)
     {
@@ -248,10 +255,10 @@ void* dequeue(void)
     q->visited++;
     void* data = ret->data;
     free(ret);
-    cnd->nxt_deq = cnd->nxt_deq->next;
-    cnd->waiting--;
     if (new_node != NULL)
     {
+        cnd->nxt_deq = cnd->nxt_deq->next;
+        cnd->waiting--;
         if (new_node->prev != NULL)
         {
             new_node->prev->next = new_node->next;
@@ -342,38 +349,36 @@ size_t visited(void)
     return q->visited;
 }
 
+//int main()
+// {
+//     int items[] = {1, 2, 3, 4, 5};
+//     size_t num_items = sizeof(items) / sizeof(items[0]);
+//     int* item = malloc(sizeof(int));
+//     initQueue();
+//     for (size_t i = 0; i < num_items; i++)
+//     {
+//         enqueue(&items[i]);
+//     }
+//     for (size_t i = 0; i < num_items; i++)
+//     {
+//         printf("Size: %zu\n", size());
+//         item = (int *)dequeue();
+//         printf("Dequeued: %d\n", *item);
+//         if(*item != items[i])
+//         {
+//             printf("dequeue test failed.\n");
+//             return 1;
+//         }
+//     }
+//     if((size() != 0))
+//     {
+//         printf("dequeue test failed.\n");
+//         return 1;
+//     }
 
+//     destroyQueue();
 
-int main()
-{
-    int items[] = {1, 2, 3, 4, 5};
-    size_t num_items = sizeof(items) / sizeof(items[0]);
-    int* item = malloc(sizeof(int));
-    initQueue();
-    for (size_t i = 0; i < num_items; i++)
-    {
-        enqueue(&items[i]);
-    }
-    for (size_t i = 0; i < num_items; i++)
-    {
-        printf("Size: %zu\n", size());
-        item = (int *)dequeue();
-        printf("Dequeued: %d\n", *item);
-        if(*item != items[i])
-        {
-            printf("dequeue test failed.\n");
-            return 1;
-        }
-    }
-    if((size() != 0))
-    {
-        printf("dequeue test failed.\n");
-        return 1;
-    }
+//     printf("enqueue and dequeue test passed.\n");
+//     return 0;
 
-    destroyQueue();
-
-    printf("enqueue and dequeue test passed.\n");
-    return 0;
-
-}
+// }
