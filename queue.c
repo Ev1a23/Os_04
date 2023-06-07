@@ -174,6 +174,7 @@ void enqueue(void* data)
 
 void* dequeue(void)
 {
+    printf("dequeue\n");
     node_cnd* new_node;
     node_fifo* tmp;
     node_fifo* ret;
@@ -188,6 +189,7 @@ void* dequeue(void)
         new_node->next = NULL;
         new_node->prev = NULL;
         new_node->cond = c;
+        printf("init new_node");
         if (cnd->head == NULL)
         {
             cnd->head = new_node;
@@ -200,6 +202,7 @@ void* dequeue(void)
             new_node->prev = cnd->tail;
             cnd->tail = new_node;
         }
+        printf("waiting");
         cnd->waiting++;
         cnd_wait(&(new_node->cond), &mtx);
     }
@@ -337,4 +340,40 @@ size_t waiting(void)
 size_t visited(void)
 {
     return q->visited;
+}
+
+
+
+int main()
+{
+    int items[] = {1, 2, 3, 4, 5};
+    size_t num_items = sizeof(items) / sizeof(items[0]);
+    int* item = malloc(sizeof(int));
+    initQueue();
+    for (size_t i = 0; i < num_items; i++)
+    {
+        enqueue(&items[i]);
+    }
+    for (size_t i = 0; i < num_items; i++)
+    {
+        printf("Size: %zu\n", size());
+        item = (int *)dequeue();
+        printf("Dequeued: %d\n", *item);
+        if(*item != items[i])
+        {
+            printf("dequeue test failed.\n");
+            return 1;
+        }
+    }
+    if((size() != 0))
+    {
+        printf("dequeue test failed.\n");
+        return 1;
+    }
+
+    destroyQueue();
+
+    printf("enqueue and dequeue test passed.\n");
+    return 0;
+
 }
