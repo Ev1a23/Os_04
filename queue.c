@@ -131,6 +131,7 @@ void enqueue(void* data)
         //there is a thread waiting to dequeue
         cnd->nxt_deq->p = new_node;
         cnd_signal(&(cnd->nxt_deq->cond));
+        cnd->nxt_deq = cnd->nxt_deq->next;
         mtx_unlock(&mtx);
         return;
     }
@@ -172,11 +173,11 @@ void enqueue(void* data)
 
 void* dequeue(void)
 {
-    node_cnd* new_node;
+    node_cnd* new_node = NULL;
     node_fifo* tmp;
     node_fifo* ret;
     cnd_t c;
-    void* data;
+    void* data = NULL;
     cnd_init(&c);
     mtx_lock(&mtx);
     if(ready_to_deq->head == NULL)
@@ -201,17 +202,17 @@ void* dequeue(void)
         }
         cnd->waiting++;
         cnd_wait(&(new_node->cond), &mtx);
-        ret = cnd->nxt_deq->p;//item in fifo
+        ret = new_node->p;
         tmp = ret->parent;//item in ready_to_deq
     }
     else
     {
         //there is an item waiting to be dequeued
-        ret = ready_to_deq->head->parent;
-        tmp = ret->parent;
+        tmp = ready_to_deq->head;
+        ret = tmp->parent;
+        
     }
     //now i have an item to dequeue
-    new_node = cnd->nxt_deq;
     if(tmp!=NULL){
         if (tmp->prev == NULL)
         {
@@ -257,7 +258,6 @@ void* dequeue(void)
     }
     if (new_node != NULL)
     {
-        cnd->nxt_deq = cnd->nxt_deq->next;
         cnd->waiting--;
         if (new_node->prev != NULL)
         {
