@@ -2,7 +2,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include "queue.c"
+#include "queue2.c"
 
 #define NUM_OPERATIONS 10
 #define MAX_SIZE 1000
@@ -337,6 +337,7 @@ void test_multiconcurrent_enqueue_dequeue()
     }
 
     // Queue should be empty
+    printf("Size: %ld\n", size());
     assert(size() == 0);
     // All items should have been dequeued
     assert(visited() == NUM_THREADS_CONC);
@@ -454,17 +455,21 @@ void test_mixed_operations()
 
 int main()
 {
-    test_destroyQueue();
-    test_enqueue_dequeue();
-    test_tryDequeue();
-    test_size();
-    test_waiting();
-    test_basic_concurrent_enqueue_dequeue();
-    test_multiconcurrent_enqueue_dequeue();
-    test_enqueue_tryDequeue();
-    test_enqueue_dequeue_with_sleep();
-    test_edge_cases();
-    test_mixed_operations();
+    for (int i = 0; i < 100; i++)
+    {
+        test_destroyQueue();
+        test_enqueue_dequeue();
+        test_tryDequeue();
+        test_size();
+        test_waiting();
+        test_basic_concurrent_enqueue_dequeue();
+        test_multiconcurrent_enqueue_dequeue();
+        test_enqueue_tryDequeue();
+        test_enqueue_dequeue_with_sleep();
+        test_edge_cases();
+        test_mixed_operations();
+    }
+
 
     return 0;
 }
