@@ -408,6 +408,7 @@ void test_multiconcurrent_enqueue_dequeue()
     }
 
     // Queue should be empty
+    printf("Size: %ld\n", size());
     assert(size() == 0);
     // All items should have been dequeued
     assert(visited() == NUM_THREADS_CONC);
